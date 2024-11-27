@@ -6,7 +6,7 @@
 #include "config.h"
 
 
-WiFiClient client;
+//WiFiClient client;
 HADevice device;
 HAMqtt mqtt(client, device);
 
@@ -16,19 +16,27 @@ HASensorNumber ha_power("power", HASensorNumber::PrecisionP2);
 HASensorNumber ha_powerfactor("powerfactor", HASensorNumber::PrecisionP2);
 HASensorNumber ha_freqency("freqency", HASensorNumber::PrecisionP2);
 HASwitch ha_switch("switch");
-
-void setupWifi(){
+String mqtthost = "";
+String mqttuser = "";
+String mqttpw = "";
+void mqttBegin(){
+  mqtthost = configtxt.getSetDefault("MQTT_ADDR","");
+  mqttuser = configtxt.getSetDefault("MQTT_USER",""); 
+  mqttpw =  configtxt.getSetDefault("MQTT_PW","");
+  mqtt.begin(
+    mqtthost.c_str(), 
+    mqttuser.c_str(), 
+    mqttpw.c_str());
+    printf("mqtt info'%s' '%s' '%s'\n",
+    mqtthost.c_str(), 
+    mqttuser.c_str(), 
+    mqttpw.c_str());
+}
+void setupMQTT(){
   
   byte mac[6];
   WiFi.macAddress(mac);
   device.setUniqueId(mac, sizeof(mac));
-
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
   
   device.setName("ESP32_SEM6000_GateWay");
   device.setSoftwareVersion("1.0.0");
@@ -52,23 +60,18 @@ void setupWifi(){
   ha_freqency.setName("Frequency");
   ha_freqency.setUnitOfMeasurement("Hz");
   
-  mqtt.begin(BROKER_ADDR, BROKER_USERNAME, BROKER_PASSWORD);
+  mqttBegin();
 }
 long nexttime = 0;
 bool onconnect = true;
 //IPAddress BROKER_ADDR=IPAddress();
-int tries=10;
-void wifiloop() {
+void mqttloop() {
   mqtt.loop();
 
   if (WiFi.status() == WL_CONNECTED){
     if(onconnect){
       onconnect=false;
-      //WiFi.hostByName("homeassistant.fritz.box",BROKER_ADDR);
-      //Serial.println(BROKER_ADDR.toString());
-      mqtt.begin(BROKER_ADDR, BROKER_USERNAME, BROKER_PASSWORD);
-      //mqtt.begin("10.0.0.16",1883,BROKER_USERNAME,BROKER_PASSWORD);
-      
+      mqttBegin();
     }
   }else{
     delay(1000);
@@ -78,12 +81,9 @@ void wifiloop() {
   if(nexttime<now){
     nexttime = now+5000;
     if(mqtt.isConnected()){
-      //Serial.println("setValue");
     }else{
-      Serial.println("mqtt not connected");
-      //WiFi.hostByName("homeassistant.fritz.box",BROKER_ADDR);
-      //Serial.println(BROKER_ADDR.toString());
-      mqtt.begin(BROKER_ADDR, BROKER_USERNAME, BROKER_PASSWORD);
+      Serial.println("MQTT! not connected!");
+      mqttBegin();
     }
   }
   
